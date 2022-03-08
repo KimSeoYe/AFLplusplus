@@ -4,7 +4,7 @@
 #include <string.h>
 #include <fcntl.h>
 
-#include "./shm_coverage.h"
+#include "../include/funcov_shm_coverage.h"
 
 int
 get_shm (shm_t type, int type_size)

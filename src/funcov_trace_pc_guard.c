@@ -6,7 +6,7 @@
 #include <execinfo.h>
 // #include <sanitizer/coverage_interface.h>
 
-#include "./shm_coverage.h"  
+#include "../include/funcov_shm_coverage.h"  
 
 #define BT_BUF_SIZE 5
 #define STR_BUFF 512
