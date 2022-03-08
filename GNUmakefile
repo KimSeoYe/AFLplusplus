@@ -311,8 +311,12 @@ ifdef TEST_MMAP
 endif
 
 .PHONY: all
-all:	test_x86 test_shm test_python ready $(PROGS) afl-as llvm gcc_plugin test_build all_done
+all:	test_x86 test_shm test_python ready $(PROGS) afl-as llvm gcc_plugin test_build all_done funcov
 	-$(MAKE) -C utils/aflpp_driver
+
+.PHONY: funcov
+funcov: ./src/funcov_trace_pc_guard.c ./src/funcov_shm_coverage.c
+	$(CC) -fsanitize=address -c ./src/funcov_trace_pc_guard.c ./src/funcov_shm_coverage.c
 
 .PHONY: llvm
 llvm:
