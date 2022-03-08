@@ -3,8 +3,11 @@ TARGETS=cJSON_example.c
 LIBS=cJSON.c 
 OBJS=cJSON.o
 
-all: $(TARGETS) $(LIBS)
-	$(CC) -o $@ $(EXECS) $(TARGETS) $(LIBS) $(CFLAGS)
+all: cJSON_example
+
+.PHONY: cJSON_example
+cJSON_example: $(TARGETS) $(LIBS)
+	$(CC) -o $@ $(TARGETS) $(LIBS)
 
 clean:
-	rm -rf $(EXECS) $(OBJS)
+	rm -rf cJSON_example $(OBJS)
