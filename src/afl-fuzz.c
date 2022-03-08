@@ -515,7 +515,7 @@ int main(int argc, char **argv_orig, char **envp) {
 
   if (get_afl_env("AFL_DEBUG")) { debug = afl->debug = 1; }
 
-  afl_state_init(afl, map_size);
+  afl_state_init(afl, map_size); 
   afl->debug = debug;
   afl_fsrv_init(&afl->fsrv);
   if (debug) { afl->fsrv.debug = true; }
@@ -1269,8 +1269,10 @@ int main(int argc, char **argv_orig, char **envp) {
 
         break;
 
+      // FUNCOV
       case 'v':
         afl->funcov = 1 ;
+        break ;
 
       default:
         if (!show_help) { show_help = 1; }

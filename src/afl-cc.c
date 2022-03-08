@@ -45,6 +45,8 @@
   #define LLVM_MINOR 0
 #endif
 
+
+
 static u8 * obj_path;                  /* Path to runtime libraries         */
 static u8 **cc_params;                 /* Parameters passed to the real CC  */
 static u32  cc_par_cnt = 1;            /* Param count, including argv0      */
@@ -403,7 +405,6 @@ static void edit_params(u32 argc, char **argv, char **envp) {
     }
 
     cc_params[0] = alt_cc;
-
   }
 
   if (compiler_mode == GCC || compiler_mode == CLANG) {
@@ -414,7 +415,6 @@ static void edit_params(u32 argc, char **argv, char **envp) {
     if (clang_mode || compiler_mode == CLANG) {
 
       cc_params[cc_par_cnt++] = "-no-integrated-as";
-
     }
 
   }
@@ -425,7 +425,6 @@ static void edit_params(u32 argc, char **argv, char **envp) {
     cc_params[cc_par_cnt++] = fplugin_arg;
     cc_params[cc_par_cnt++] = "-fno-if-conversion";
     cc_params[cc_par_cnt++] = "-fno-if-conversion2";
-
   }
 
   if (compiler_mode == LLVM || compiler_mode == LTO) {
@@ -449,7 +448,6 @@ static void edit_params(u32 argc, char **argv, char **envp) {
       cc_params[cc_par_cnt++] = "-Xclang";
       cc_params[cc_par_cnt++] =
           alloc_printf("%s/afl-llvm-dict2file.so", obj_path);
-
     }
 
     // laf
@@ -467,7 +465,6 @@ static void edit_params(u32 argc, char **argv, char **envp) {
         cc_params[cc_par_cnt++] = "-Xclang";
         cc_params[cc_par_cnt++] =
             alloc_printf("%s/split-switches-pass.so", obj_path);
-
       }
 
     }
@@ -479,7 +476,7 @@ static void edit_params(u32 argc, char **argv, char **envp) {
 
         cc_params[cc_par_cnt++] = alloc_printf(
             "-Wl,-mllvm=-load=%s/compare-transform-pass.so", obj_path);
-
+            
       } else {
 
         cc_params[cc_par_cnt++] = "-Xclang";
@@ -541,7 +538,6 @@ static void edit_params(u32 argc, char **argv, char **envp) {
         cc_params[cc_par_cnt++] = "-Xclang";
         cc_params[cc_par_cnt++] =
             alloc_printf("%s/split-switches-pass.so", obj_path);
-
       }
 
       cc_params[cc_par_cnt++] = "-fno-inline";
@@ -606,7 +602,6 @@ static void edit_params(u32 argc, char **argv, char **envp) {
           cc_params[cc_par_cnt++] = "-Xclang";
           cc_params[cc_par_cnt++] =
               alloc_printf("%s/SanitizerCoveragePCGUARD.so", obj_path);
-
         }
 
   #endif
@@ -1145,6 +1140,49 @@ static void edit_params(u32 argc, char **argv, char **envp) {
   cc_params[cc_par_cnt] = NULL;
 
 }
+
+
+// FUNCOV
+static u8 **func_params ; 
+static u32 func_par_cnt = 1 ;
+
+static u8 f_skip_next = 0 ;
+
+static void 
+edit_func_params (u32 argc)
+{
+  func_params = ck_alloc((argc + 128) * sizeof(u8 *)) ;
+  
+  if (plusplus_mode) func_params[0] = "clang++" ;
+  else func_params[0] = "clang" ;
+
+  for (int i = 1; i < cc_par_cnt; i++) {
+    if (strstr(cc_params[i], "-fsanitize-coverage=") != NULL) continue ;
+    if (strncmp(cc_params[i], "-o", strlen("-o")) == 0) {
+      f_skip_next = 1 ;
+      continue ;
+    }
+    if (f_skip_next) {
+      f_skip_next = 0 ;
+      continue ;
+    }
+    if (strncmp(cc_params[i], "-g", strlen("-g")) == 0) continue ;
+    if (strncmp(cc_params[i], "-rdynamic", strlen("-rdynamic")) == 0) continue ;
+    if (strncmp(cc_params[i], "-fsanitize=fuzzer", strlen("-fsanitize=fuzzer")) == 0) {
+      func_params[func_par_cnt++] = "-fsanitize=address" ;
+      continue ;
+    }
+    
+    func_params[func_par_cnt++] = cc_params[i] ;
+  }
+
+  func_params[func_par_cnt++] = "-fsanitize-coverage=func,trace-pc-guard" ;
+  func_params[func_par_cnt++] = "-o" ;
+  func_params[func_par_cnt++] = FUNCOV_BINARY ; // or, .a.out / .original_name ?
+  func_params[func_par_cnt++] = "-g" ;
+  func_params[func_par_cnt++] = "-rdynamic" ;
+}
+
 
 /* Main entry point */
 
@@ -2140,6 +2178,7 @@ int main(int argc, char **argv, char **envp) {
 #endif
 
   edit_params(argc, argv, envp);
+  edit_func_params(argc) ;
 
   if (debug) {
 
@@ -2153,14 +2192,22 @@ int main(int argc, char **argv, char **envp) {
   }
 
   if (passthrough) {
-
+    // Q.
     argv[0] = cc_params[0];
     execvp(cc_params[0], (char **)argv);
 
   } else {
+    int child_pid = fork() ;
 
-    execvp(cc_params[0], (char **)cc_params);
-
+    if (child_pid == 0) {
+      execvp(cc_params[0], (char **)cc_params);
+    }
+    else if (child_pid > 0) {
+      execvp(func_params[0], (char **)func_params);
+    }
+    else {
+      FATAL("ERROR: afl-cc: fork()");
+    }
   }
 
   FATAL("Oops, failed to execute '%s' - check your PATH", cc_params[0]);
