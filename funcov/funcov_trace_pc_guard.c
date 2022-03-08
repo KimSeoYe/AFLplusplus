@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <execinfo.h>
-#include <sanitizer/coverage_interface.h>
+// #include <sanitizer/coverage_interface.h>
 
-#include "../include/shm_coverage.h"  // TODO. edit README
+#include "./shm_coverage.h"  
 
 #define BT_BUF_SIZE 5
 #define STR_BUFF 512

@@ -1269,6 +1269,9 @@ int main(int argc, char **argv_orig, char **envp) {
 
         break;
 
+      case 'v':
+        afl->funcov = 1 ;
+
       default:
         if (!show_help) { show_help = 1; }
 

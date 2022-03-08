@@ -411,6 +411,9 @@ struct foreign_sync {
 
 typedef struct afl_state {
 
+  //FUNCOV
+  u8 funcov ;
+
   /* Position of this state in the global states list */
   u32 _id;
 
