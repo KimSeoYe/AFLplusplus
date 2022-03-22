@@ -1172,6 +1172,12 @@ edit_func_params (u32 argc)
       func_params[func_par_cnt++] = "-fsanitize=address" ;
       continue ;
     }
+    if (strcmp(cc_params[i], "afl-compiler-rt.o") == 0) {
+      func_params[func_par_cnt++] = alloc_printf("%s/funcov_trace_pc_guard.o", obj_path) ;
+      func_params[func_par_cnt++] = alloc_printf("%s/funcov_shm_coverage.o", obj_path) ; // TODO.
+      printf("obj_path: %s\n", obj_path) ;
+      continue ;
+    }
     
     func_params[func_par_cnt++] = cc_params[i] ;
   }
