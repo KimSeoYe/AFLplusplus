@@ -507,7 +507,7 @@
 #define AFL_TXT_STRING_MAX_MUTATIONS 6
 
 /* FUNCOV */
-#define FUNCOV_BINARY ".funcov" 
+#define FUNCOV_BIN_DEFAULT ".funcov" 
 
 #endif                                                  /* ! _HAVE_CONFIG_H */
 

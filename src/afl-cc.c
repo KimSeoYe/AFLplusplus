@@ -1146,6 +1146,7 @@ static void edit_params(u32 argc, char **argv, char **envp) {
 static u8 **func_params ; 
 static u32 func_par_cnt = 1 ;
 static u8 f_skip_next = 0 ;
+static u8 o_idx = 0 ;
 
 static void 
 edit_func_params (u32 argc)
@@ -1159,6 +1160,7 @@ edit_func_params (u32 argc)
     if (strstr(cc_params[i], "-fsanitize-coverage=") != NULL) continue ;
     if (strncmp(cc_params[i], "-o", strlen("-o")) == 0) {
       f_skip_next = 1 ;
+      o_idx = i ;
       continue ;
     }
     if (f_skip_next) {
@@ -1183,7 +1185,12 @@ edit_func_params (u32 argc)
 
   func_params[func_par_cnt++] = "-fsanitize-coverage=func,trace-pc-guard" ;
   func_params[func_par_cnt++] = "-o" ;
-  func_params[func_par_cnt++] = FUNCOV_BINARY ; // or, .a.out / .original_name ?
+  // func_params[func_par_cnt++] = FUNCOV_BIN_DEFAULT ; // or, .a.out / .original_name ?
+  if (o_idx != 0) 
+    func_params[func_par_cnt++] = alloc_printf(".%s", cc_params[o_idx + 1]) ;
+  else {
+    func_params[func_par_cnt++] = FUNCOV_BIN_DEFAULT ;
+  }
   func_params[func_par_cnt++] = "-g" ;
   func_params[func_par_cnt++] = "-rdynamic" ;
 }
