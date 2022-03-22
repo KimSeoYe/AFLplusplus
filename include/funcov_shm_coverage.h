@@ -30,6 +30,8 @@ typedef enum shm {
     USE
 } shm_t ;
 
+unsigned short hash16 (char * key) ;
+
 int get_shm (shm_t type, int type_size) ;
 void * attatch_shm (int shm_id) ;
 void detatch_shm (void * shm_addr) ;

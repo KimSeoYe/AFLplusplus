@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <execinfo.h>
-// #include <sanitizer/coverage_interface.h>
 
 #include "../include/funcov_shm_coverage.h"  
 
@@ -75,17 +74,17 @@ parse_string (char * cov_string, char ** strings)
 	return 1 ;
 }
 
-unsigned short
-hash16 (char * cov_string)  // TODO. not tested
-{
-	unsigned int h = 0 ;
+// unsigned short
+// hash16 (char * cov_string)  // TODO. not tested
+// {
+// 	unsigned int h = 0 ;
 
-	while (*cov_string) {
-		h = h * 23131 + (unsigned char)*cov_string++ ;
-	}
+// 	while (*cov_string) {
+// 		h = h * 23131 + (unsigned char)*cov_string++ ;
+// 	}
 
-	return (h & 0xffff) ;
-}
+// 	return (h & 0xffff) ;
+// }
 
 void
 get_coverage (char ** strings)

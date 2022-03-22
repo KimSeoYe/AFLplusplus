@@ -6,6 +6,18 @@
 
 #include "../include/funcov_shm_coverage.h"
 
+unsigned short
+hash16 (char * key)  // TODO. not tested
+{
+	unsigned int h = 0 ;
+
+	while (*key) {
+		h = h * 23131 + (unsigned char)*key++ ;
+	}
+
+	return (h & 0xffff) ;
+}
+
 int
 get_shm (shm_t type, int type_size)
 {

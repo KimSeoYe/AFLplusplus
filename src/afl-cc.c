@@ -1145,7 +1145,6 @@ static void edit_params(u32 argc, char **argv, char **envp) {
 // FUNCOV
 static u8 **func_params ; 
 static u32 func_par_cnt = 1 ;
-
 static u8 f_skip_next = 0 ;
 
 static void 

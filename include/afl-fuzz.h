@@ -45,6 +45,7 @@
 #include "sharedmem.h"
 #include "forkserver.h"
 #include "common.h"
+#include "funcov.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -411,8 +412,7 @@ struct foreign_sync {
 
 typedef struct afl_state {
 
-  //FUNCOV
-  u8 funcov ;
+  u8 funcov_mode ;
 
   /* Position of this state in the global states list */
   u32 _id;

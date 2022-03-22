@@ -1269,9 +1269,8 @@ int main(int argc, char **argv_orig, char **envp) {
 
         break;
 
-      // FUNCOV
       case 'v':
-        afl->funcov = 1 ;
+        afl->funcov_mode = 1 ;  // TODO. long option
         break ;
 
       default:

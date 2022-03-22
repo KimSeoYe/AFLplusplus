@@ -1,0 +1,9 @@
+#ifndef GETCOV
+#define GETCOV
+
+#include "funcov_shm_coverage.h"
+
+unsigned int count_coverage (map_elem_t * shm_map) ;
+unsigned int get_trace_coverage(unsigned int prev_cov, map_elem_t * trace_map, cov_stat_t * curr_stat) ;
+
+#endif
