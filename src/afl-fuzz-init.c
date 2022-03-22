@@ -1959,6 +1959,22 @@ void setup_dirs_fds(afl_state_t *afl) {
 
   }
 
+  /* FUNCOV: In funcov_mode, make the proper directories */
+
+  if (afl->funcov_mode) {
+    tmp = alloc_printf("%s/funcov", afl->out_dir) ;
+    if (mkdir(tmp, 0700)) { PFATAL("Unable to create '%s'", tmp); }
+    ck_free(tmp);
+
+    tmp = alloc_printf("%s/funcov/funcov_per_seed", afl->out_dir) ;
+    if (mkdir(tmp, 0700)) { PFATAL("Unable to create '%s'", tmp); }
+    ck_free(tmp);
+
+    tmp = alloc_printf("%s/funcov/seed_per_func", afl->out_dir) ;
+    if (mkdir(tmp, 0700)) { PFATAL("Unable to create '%s'", tmp); }
+    ck_free(tmp);
+  }
+
   /* Queue directory for any starting & discovered paths. */
 
   tmp = alloc_printf("%s/queue", afl->out_dir);

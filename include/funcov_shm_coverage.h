@@ -19,7 +19,6 @@ typedef struct map_elem {
 } map_elem_t ;
 
 typedef struct cov_stat {
-    int id ;
     int exit_code ;
     unsigned int fun_coverage ;
     map_elem_t map[FUNCOV_MAP_SIZE] ;

@@ -9,18 +9,18 @@
 
 #include "afl-fuzz.h"
 
+#include "funcov_get_coverage.h"
+#include "funcov_shm_coverage.h"
+#include "funcov_translate_addr.h"
+
 typedef enum input_type { STDIN = 0, ARG_FILENAME } input_type_t ;
 
 typedef struct config {    // Q. don't need to use a struct?
-    input_type_t input_type ;
-    char binary_path[PATH_MAX] ;
-    char input_dir_path[PATH_MAX] ;
-    char output_dir_path[PATH_MAX] ;
-    
-    int input_file_cnt ;
-    char ** input_files ;
+    int shmid ;
+    input_type_t input_type ; // => afl->fsrv.use_stdin
+    char bin_path[PATH_MAX] ;   /* Executable binary for funcov */
+    char input_file[PATH_MAX] ; 
+    char out_dir[PATH_MAX] ;
 } config_t ;
-
-int funcov (afl_state_t * afl, u8 * seed_path) ;
 
 #endif

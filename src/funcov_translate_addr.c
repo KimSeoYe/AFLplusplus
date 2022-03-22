@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 
 #include "../include/funcov_translate_addr.h"
+#include "../include/funcov_shm_coverage.h"
 
 void
 get_pc_val (char * dst, char * src)
@@ -20,7 +21,7 @@ get_pc_val (char * dst, char * src)
 }
 
 void
-tokenize_cov_strings (char ** argv, int cov_cnt, map_elem_t * trace_map)
+tokenize_cov_strings (char ** argv, map_elem_t * trace_map)
 {
 	int index = 3 ;
 
@@ -56,7 +57,7 @@ execute_addr2line (char ** argv)
 }
 
 int
-save_locations (location_t * translated_locations, char ** argv, int cov_cnt)
+save_locations (location_t * translated_locations, char ** argv)
 {
 	close(in_pipe[0]) ;
 	close(err_pipe[0]) ;
@@ -77,7 +78,7 @@ save_locations (location_t * translated_locations, char ** argv, int cov_cnt)
 		buf[len - 1] = 0x0 ;
 
 		int found = 0 ;
-		unsigned short id = hash16(argv[cnt + 3]) ;
+		int id = hash16(argv[cnt + 3]) ;
 		for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
 			if (id >= FUNCOV_MAP_SIZE) id = 0 ;
 
@@ -121,7 +122,7 @@ translate_pc_values (location_t * translated_locations, int cov_cnt, map_elem_t 
 
 	argv[cov_cnt + 3] = (char *)0x0 ;
 
-	tokenize_cov_strings(argv, cov_cnt, trace_map) ;
+	tokenize_cov_strings(argv, trace_map) ;
 
 	if (pipe(in_pipe) != 0) goto pipe_err ;
 	if (pipe(out_pipe) != 0) goto pipe_err ;
@@ -133,7 +134,7 @@ translate_pc_values (location_t * translated_locations, int cov_cnt, map_elem_t 
 		if (execute_addr2line(argv) == -1) return -1 ;
 	}
 	else if (child_pid > 0) {
-		if (save_locations (translated_locations, argv, cov_cnt) == -1) return -1 ;
+		if (save_locations (translated_locations, argv) == -1) return -1 ;
 	}
 	else {
 		perror("translate_pc_values: fork") ;
@@ -161,7 +162,7 @@ find_location_info (char * dst, location_t * translated_locations, char * cov_st
     get_pc_val(pc_val, cov_string) ;
 
     int found = 0 ;
-    unsigned short id = hash16(pc_val) ;
+    int id = hash16(pc_val) ;
     for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
         if (id >= FUNCOV_MAP_SIZE) id = 0 ;
         if (!translated_locations[id].exist) goto not_found ;

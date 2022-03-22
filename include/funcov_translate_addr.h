@@ -11,7 +11,6 @@ typedef struct location {
     char location[PATH_MAX] ;
 } location_t ;
 
-// unsigned short hash16 (char * key) ;
 void get_pc_val (char * dst, char * src) ;
 int translate_pc_values (location_t * translated_locations, int cov_cnt, map_elem_t * trace_map, char * binary_path) ;
 int find_location_info (char * dst, location_t * translated_locations, char * cov_string) ;
