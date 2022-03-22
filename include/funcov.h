@@ -7,6 +7,8 @@
 
 #define LOGNAME "cov.log"
 
+#include "afl-fuzz.h"
+
 typedef enum input_type { STDIN = 0, ARG_FILENAME } input_type_t ;
 
 typedef struct config {    // Q. don't need to use a struct?

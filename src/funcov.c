@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
+#include "../include/afl-fuzz.h"
 #include "../include/funcov.h"
 #include "../include/funcov_shm_coverage.h"
 #include "../include/funcov_get_coverage.h"
@@ -581,6 +582,7 @@ funcov_destroy ()
 int
 funcov (afl_state_t * afl, u8 * seed_path) 
 {
+    
     return 0 ;
 }
 

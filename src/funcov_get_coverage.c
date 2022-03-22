@@ -8,7 +8,7 @@ count_coverage (map_elem_t * shm_map)
 {
     int cov = 0 ;
 
-    for (int i = 0; i < MAP_SIZE; i++) {
+    for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
         if (shm_map[i].hit_count != 0) cov++ ;
     }
 
@@ -20,12 +20,12 @@ get_trace_coverage (unsigned int prev_cov, map_elem_t * trace_map, cov_stat_t * 
 {
     unsigned int new_cov = 0 ;
 
-    for (int cur_idx = 0; cur_idx < MAP_SIZE; cur_idx++) {
+    for (int cur_idx = 0; cur_idx < FUNCOV_MAP_SIZE; cur_idx++) {
         if (curr_stat->map[cur_idx].hit_count == 0) continue ;
 
         int trace_idx = cur_idx ; 
         int found = 0 ;
-        for (int i = 0; i < MAP_SIZE; i++) {
+        for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
             if (trace_map[trace_idx].hit_count == 0) {
                 trace_map[trace_idx].hit_count += curr_stat->map[cur_idx].hit_count ;
                 strcpy(trace_map[trace_idx].cov_string, curr_stat->map[cur_idx].cov_string) ;

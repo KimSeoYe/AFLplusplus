@@ -24,7 +24,7 @@ tokenize_cov_strings (char ** argv, int cov_cnt, map_elem_t * trace_map)
 {
 	int index = 3 ;
 
-	for (int i = 0; i < MAP_SIZE; i++) {
+	for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
 		if (trace_map[i].hit_count != 0) {
 			get_pc_val(argv[index], trace_map[i].cov_string) ;	// TODO. pass the address?
 			index++ ;
@@ -78,8 +78,8 @@ save_locations (location_t * translated_locations, char ** argv, int cov_cnt)
 
 		int found = 0 ;
 		unsigned short id = hash16(argv[cnt + 3]) ;
-		for (int i = 0; i < MAP_SIZE; i++) {
-			if (id >= MAP_SIZE) id = 0 ;
+		for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
+			if (id >= FUNCOV_MAP_SIZE) id = 0 ;
 
 			if (translated_locations[id].exist) id++ ;
 			else {
@@ -162,8 +162,8 @@ find_location_info (char * dst, location_t * translated_locations, char * cov_st
 
     int found = 0 ;
     unsigned short id = hash16(pc_val) ;
-    for (int i = 0; i < MAP_SIZE; i++) {
-        if (id >= MAP_SIZE) id = 0 ;
+    for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
+        if (id >= FUNCOV_MAP_SIZE) id = 0 ;
         if (!translated_locations[id].exist) goto not_found ;
 
         if (strcmp(pc_val, translated_locations[id].pc_val) == 0) {

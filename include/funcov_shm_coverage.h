@@ -10,7 +10,7 @@
 
 #define PATH_MAX 4096
 #define BUF_SIZE 1024
-#define MAP_SIZE 65536
+#define FUNCOV_MAP_SIZE 65536
 #define COV_STRING_MAX 512
 
 typedef struct map_elem {
@@ -22,7 +22,7 @@ typedef struct cov_stat {
     int id ;
     int exit_code ;
     unsigned int fun_coverage ;
-    map_elem_t map[MAP_SIZE] ;
+    map_elem_t map[FUNCOV_MAP_SIZE] ;
 } cov_stat_t ;
 
 typedef enum shm {

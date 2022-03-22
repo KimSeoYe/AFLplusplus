@@ -98,8 +98,8 @@ get_coverage (char ** strings)
 		unsigned int id = hash16(cov_string) ;
 
 		int found = 0 ;
-		for (int i = 0; i < MAP_SIZE; i++) {
-			if (id >= MAP_SIZE) {
+		for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
+			if (id >= FUNCOV_MAP_SIZE) {
 				id = 0 ;
 				continue ;
 			}

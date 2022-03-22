@@ -1,4 +1,4 @@
-CC=gcc
+CC?=gcc
 TARGETS=cJSON_example.c 
 LIBS=cJSON.c 
 OBJS=cJSON.o
