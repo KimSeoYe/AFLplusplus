@@ -1169,25 +1169,20 @@ edit_func_params (u32 argc)
     }
     if (strncmp(cc_params[i], "-g", strlen("-g")) == 0) continue ;
     if (strncmp(cc_params[i], "-rdynamic", strlen("-rdynamic")) == 0) continue ;
-    if (strncmp(cc_params[i], "-fsanitize=fuzzer", strlen("-fsanitize=fuzzer")) == 0) {
-      func_params[func_par_cnt++] = "-fsanitize=address" ;
-      continue ;
-    }
-    if (strcmp(cc_params[i], "afl-compiler-rt.o") == 0) {
-      func_params[func_par_cnt++] = alloc_printf("%s/funcov_trace_pc_guard.o", obj_path) ;
-      func_params[func_par_cnt++] = alloc_printf("%s/funcov_shm_coverage.o", obj_path) ; // TODO.
-      printf("obj_path: %s\n", obj_path) ;
-      continue ;
-    }
+    if (strncmp(cc_params[i], "-fsanitize=fuzzer", strlen("-fsanitize=fuzzer")) == 0) continue ;
+    if (strcmp(cc_params[i], "afl-compiler-rt.o") == 0) continue ;
     
     func_params[func_par_cnt++] = cc_params[i] ;
   }
 
+  func_params[func_par_cnt++] = "-fsanitize=address" ; // TODO. if already exist?
   func_params[func_par_cnt++] = "-fsanitize-coverage=func,trace-pc-guard" ;
+  func_params[func_par_cnt++] = alloc_printf("%s/funcov_trace_pc_guard.o", obj_path) ;
+  func_params[func_par_cnt++] = alloc_printf("%s/funcov_shm_coverage.o", obj_path) ; // TODO.
   func_params[func_par_cnt++] = "-o" ;
-  // func_params[func_par_cnt++] = FUNCOV_BIN_DEFAULT ; // or, .a.out / .original_name ?
-  if (o_idx != 0) 
+  if (o_idx != 0) {
     func_params[func_par_cnt++] = alloc_printf(".%s", cc_params[o_idx + 1]) ;
+  }
   else {
     func_params[func_par_cnt++] = FUNCOV_BIN_DEFAULT ;
   }

@@ -414,7 +414,7 @@ struct foreign_sync {
 typedef struct afl_state {
 
   u8 funcov_mode ;
-  int funcov_shmid ;
+  funcov_t funcov ;
 
   /* Position of this state in the global states list */
   u32 _id;
@@ -991,7 +991,9 @@ struct custom_mutator {
 };
 
 /* FUNCOV */
-int funcov (afl_state_t * afl, u8 * seed_path) ;
+void remove_shared_mem (afl_state_t * afl) ; // TODO. pass only shm (curr_stat)
+void funcov_init (afl_state_t * afl) ;
+int funcov (afl_state_t * afl, void * mem, u32 len, u8 * seed_path) ;
 
 void afl_state_init(afl_state_t *, uint32_t map_size);
 void afl_state_deinit(afl_state_t *);

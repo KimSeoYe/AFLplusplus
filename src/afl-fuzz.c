@@ -536,7 +536,7 @@ int main(int argc, char **argv_orig, char **envp) {
   while (
       (opt = getopt(
            argc, argv,
-           "+Ab:B:c:CdDe:E:hi:I:f:F:g:G:l:L:m:M:nNOo:p:RQs:S:t:T:UV:WXx:YZ")) >
+           "+Ab:B:c:CdDe:E:hi:I:f:F:g:G:l:L:m:M:nNOo:p:RQs:S:t:T:UV:vWXx:YZ")) >
       0) {
 
     switch (opt) {
@@ -2108,6 +2108,11 @@ int main(int argc, char **argv_orig, char **envp) {
 
   }
 
+  // FUNCOV
+  if (afl->funcov_mode) {
+    funcov_init(afl) ;
+  }
+
   load_auto(afl);
 
   if (extras_dir_cnt) {
@@ -2583,6 +2588,7 @@ stop_fuzzing:
   destroy_extras(afl);
   destroy_custom_mutators(afl);
   afl_shm_deinit(&afl->shm);
+  remove_shared_mem (afl) ;
 
   if (afl->shm_fuzz) {
 

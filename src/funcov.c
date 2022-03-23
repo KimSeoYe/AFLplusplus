@@ -11,8 +11,7 @@
 
 #include "../include/afl-fuzz.h"
 
-static config_t conf ;
-static cov_stat_t * curr_stat ; // shm
+funcov_t * conf ;
 
 /**
  * TODO.
@@ -23,37 +22,50 @@ static cov_stat_t * curr_stat ; // shm
 */
 
 void
-remove_shared_mem ()
+remove_shared_mem (afl_state_t * afl)
 {
-    detatch_shm((void *)curr_stat) ;
-    remove_shm(conf.shmid) ;
+    detatch_shm((void *)(afl->funcov.curr_stat)) ;
+    remove_shm(afl->funcov.shmid) ;
 }
 
 void
-shm_init ()
+shm_init (afl_state_t * afl)
 {
-    conf.shmid = get_shm(INIT, sizeof(cov_stat_t)) ;
-    curr_stat = attatch_shm(conf.shmid) ;
-    memset(curr_stat, 0, sizeof(cov_stat_t)) ;
+    afl->funcov.shmid = get_shm(INIT, sizeof(cov_stat_t)) ;
+    afl->funcov.curr_stat = attatch_shm(afl->funcov.shmid) ;
+    memset(afl->funcov.curr_stat, 0, sizeof(cov_stat_t)) ;
 }
 
 void 
-funcov_init (afl_state_t * afl, char * seed_path)  // TODO. in afl init...
+funcov_init (afl_state_t * afl)
 {
-    conf.shmid = afl->funcov_shmid ;
+    if (afl->fsrv.use_stdin) afl->funcov.input_type = STDIN ;
+    else afl->funcov.input_type = ARG_FILENAME ;
 
-    if (afl->fsrv.use_stdin) conf.input_type = STDIN ;
-    else conf.input_type = ARG_FILENAME ;
-
-    strcpy(conf.bin_path, afl->fsrv.target_path) ; 
+    int position = -1 ;
     for (int i = strlen(afl->fsrv.target_path) - 1; i >= 0; i--) {
-        if (conf.bin_path[i] == '/') {
-            conf.bin_path[i] = '\0' ;
+        if (afl->fsrv.target_path[i] == '/') {
+            position = i ;
             break ;
         }
     }
-    strcpy(conf.input_file, seed_path) ;
-    sprintf(conf.out_dir, "%s/funcov", afl->out_dir) ;
+    if (position > 0) {
+        char dir_path[PATH_MAX] ;
+        strncpy(dir_path, afl->fsrv.target_path, position) ; 
+        dir_path[position] = '\0' ;
+        sprintf(afl->funcov.bin_path, "%s/.%s", dir_path, afl->fsrv.target_path + position + 1) ;
+    }
+    else {
+        sprintf(afl->funcov.bin_path, ".%s", afl->fsrv.target_path) ;
+    }
+
+    if (access(afl->funcov.bin_path, X_OK) == -1) {
+        PFATAL("could not find %s", afl->funcov.bin_path) ;
+    }
+    
+    sprintf(afl->funcov.out_dir, "%s/funcov", afl->out_dir) ;
+
+    shm_init(afl) ;
 }
 
 
@@ -70,38 +82,24 @@ timeout_handler (int sig)
         perror("timeout") ;
         if (kill(child_pid, SIGINT) == -1) {
             perror("timeout_handler: kill") ;
-            remove_shared_mem() ;
+            // remove_shared_mem(afl) ;
             exit(1) ;   // Q.
         }
     }
 }
 
 void
-execute_target ()
+execute_target (void * mem, u32 len)
 {
     alarm(3) ;
 
-    FILE * fp = fopen(conf.input_file, "rb") ;
-    if (fp == 0x0) {
-        perror("execute_target: fopen") ;
-        remove_shared_mem() ;
-        exit(1) ;
-    }
-
-    if (conf.input_type == STDIN) {
-        while (!feof(fp)) {
-            char buf[BUF_SIZE] ;
-            int r_len = fread(buf, 1, sizeof(buf), fp) ;
-
-            char * buf_p = buf ;
-            int s ;
-            while (r_len > 0 && (s = write(stdin_pipe[1], buf_p, r_len)) > 0) {
-                buf_p += s ;
-                r_len -= s ;
-            }
+    if (conf->input_type == STDIN) {
+        u32 s = write(stdin_pipe[1], mem, len) ;
+        if (s != len) {
+            PFATAL("funcov: short write") ;
         }
     }
-    fclose(fp) ;
+    
     close(stdin_pipe[1]) ;
 
     dup2(stdin_pipe[0], 0) ;
@@ -115,19 +113,19 @@ execute_target ()
 
     // TODO. ASAN_OPTION
 
-    if (conf.input_type == STDIN) {
-        char * args[] = { conf.bin_path, (char *)0x0 } ;
-        if (execv(conf.bin_path, args) == -1) {
+    if (conf->input_type == STDIN) {
+        char * args[] = { conf->bin_path, (char *)0x0 } ;
+        if (execv(conf->bin_path, args) == -1) {
             perror("execute_target: execv") ;
-            remove_shared_mem() ;
+            // remove_shared_mem(afl) ;
             exit(1) ;
         }
     } 
-    else if (conf.input_type == ARG_FILENAME) {
-        char * args[] = { conf.bin_path, conf.input_file, (char *)0x0 } ;
-        if (execv(conf.bin_path, args) == -1) {
+    else if (conf->input_type == ARG_FILENAME) {
+        char * args[] = { conf->bin_path, conf->input_file, (char *)0x0 } ;
+        if (execv(conf->bin_path, args) == -1) {
             perror("execute_target: execv") ;
-            remove_shared_mem() ;
+            // remove_shared_mem(afl) ;
             exit(1) ;
         }
     }
@@ -145,9 +143,9 @@ close_pipes ()
 }
 
 int
-run ()
+run (void * mem, u32 len)
 {
-    memset(curr_stat, 0, sizeof(cov_stat_t)) ;
+    memset(conf->curr_stat, 0, sizeof(cov_stat_t)) ;
 
     if (pipe(stdin_pipe) != 0) goto pipe_err ;
     if (pipe(stdout_pipe) != 0) goto pipe_err ;
@@ -156,7 +154,7 @@ run ()
     child_pid = fork() ; 
 
     if (child_pid == 0) {
-        execute_target() ;
+        execute_target(mem, len) ;
     }
     else if (child_pid > 0) {
         close_pipes() ;
@@ -173,7 +171,7 @@ run ()
 
 pipe_err:
     perror("run: pipe") ;
-    remove_shared_mem() ;
+    // remove_shared_mem(afl) ;
     exit(1) ;
 }
 
@@ -197,7 +195,7 @@ void
 write_covered_funs_csv(char * funcov_dir_path) 
 {
     char input_filename[PATH_MAX] ;
-    parse_file_name(input_filename, conf.input_file) ; // TODO. tokenize long path
+    parse_file_name(input_filename, conf->input_file) ; // TODO. tokenize long path
     
     char funcov_file_path[PATH_MAX + 256] ;
     sprintf(funcov_file_path, "%s/%s.csv", funcov_dir_path, input_filename) ;
@@ -205,19 +203,19 @@ write_covered_funs_csv(char * funcov_dir_path)
     FILE * fp = fopen(funcov_file_path, "wb") ;
     if (fp == 0x0) {
         perror("write_covered_funs_csv: fopen") ;
-        remove_shared_mem() ;
+        // remove_shared_mem(afl) ;
         exit(1) ;
     }
 
     fprintf(fp, "callee,caller,pc_val,called_location\n") ; 
     for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
-        if (curr_stat->map[i].hit_count == 0) continue ;
+        if (conf->curr_stat->map[i].hit_count == 0) continue ;
             
-        fprintf(fp, "%s,", curr_stat->map[i].cov_string) ; 
+        fprintf(fp, "%s,", conf->curr_stat->map[i].cov_string) ; 
         
         // char location[PATH_MAX] ;
         // if (find_location_info(location, translated_locations, cov_stats[turn].map[i].cov_string) == -1) {
-        //     remove_shared_mem() ;
+        //     remove_shared_mem(afl) ;
         //     exit(1) ;
         // }
         // fprintf(fp, "%s\n", location) ;
@@ -233,19 +231,19 @@ write_covered_funs_csv(char * funcov_dir_path)
 //     location_t * translated_locations = (location_t *) malloc(sizeof(location_t) *  FUNCOV_MAP_SIZE) ;
 //     if (translated_locations == 0x0) {
 //         perror("save_final_results: malloc") ;
-//         remove_shared_mem() ;
+//         remove_shared_mem(afl) ;
 //         exit(1) ;
 //     }
 //     memset(translated_locations, 0, sizeof(location_t) * FUNCOV_MAP_SIZE) ;
 
-//     int translate_success = translate_pc_values(translated_locations, curr_stat->fun_coverage, curr_stat->map, conf.bin_path) ;
+//     int translate_success = translate_pc_values(translated_locations, afl->funcov.curr_stat->fun_coverage, afl->funcov.curr_stat->map, afl->funcov.bin_path) ;
 //     if (translate_success == -1) {
-//         remove_shared_mem() ;
+//         remove_shared_mem(afl) ;
 //         exit(1) ;
 //     }
 
 //     char funcov_dir_path[PATH_MAX + 32] ;
-//     sprintf(funcov_dir_path, "%s/funcov_per_seed", conf.out_dir) ;
+//     sprintf(funcov_dir_path, "%s/funcov_per_seed", afl->funcov.out_dir) ;
 //     write_covered_funs_csv(funcov_dir_path, translated_locations) ; // TODO. translated_locations
 
 //     free(translated_locations) ;
@@ -253,16 +251,19 @@ write_covered_funs_csv(char * funcov_dir_path)
 
 
 int
-funcov (afl_state_t * afl, u8 * seed_path) 
+funcov (afl_state_t * afl, void * mem, u32 len, u8 * seed_path) 
 {
-    funcov_init(afl, seed_path) ;
+    signal(SIGALRM, timeout_handler) ;
     
-    int exit_code = run() ;
-    curr_stat->exit_code = exit_code ;
-    curr_stat->fun_coverage = count_coverage(curr_stat->map) ;
+    strcpy(afl->funcov.input_file, seed_path) ;
+    conf = &(afl->funcov) ;
+    
+    int exit_code = run(mem, len) ;
+    conf->curr_stat->exit_code = exit_code ;
+    conf->curr_stat->fun_coverage = count_coverage(conf->curr_stat->map) ;
 
     char funcov_dir_path[PATH_MAX + 32] ;
-    sprintf(funcov_dir_path, "%s/funcov_per_seed", conf.out_dir) ;
+    sprintf(funcov_dir_path, "%s/funcov_per_seed", conf->out_dir) ;
     write_covered_funs_csv(funcov_dir_path) ;
 
     return 0 ;
