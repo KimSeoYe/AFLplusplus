@@ -10,4 +10,4 @@ cJSON_example: $(TARGETS) $(LIBS)
 	$(CC) -o $@ $(TARGETS) $(LIBS)
 
 clean:
-	rm -rf cJSON_example $(OBJS)
+	rm -rf cJSON_example $(OBJS) .cJSON_example

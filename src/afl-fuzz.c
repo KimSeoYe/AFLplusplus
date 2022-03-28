@@ -548,9 +548,9 @@ int main(int argc, char **argv_orig, char **envp) {
 
     switch (opt) {
       case 0:
-        if (strcmp(long_options[opt_idx].name, "funcov") == 0) {
+        if (opt_idx == 0) {
           afl->funcov_mode = 1 ;
-        }  
+        }
         break ;
 
       case 'g':

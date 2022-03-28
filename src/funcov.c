@@ -36,7 +36,7 @@ remove_shared_mem_from_conf ()
 }
 
 void
-shm_init (afl_state_t * afl)
+shm_init (afl_state_t * afl)    // TODO. if get/attatch shm failed?
 {
     afl->funcov.shmid = get_shm(INIT, sizeof(cov_stat_t)) ;
     afl->funcov.curr_stat = attatch_shm(afl->funcov.shmid) ;
@@ -88,9 +88,8 @@ timeout_handler (int sig)
     if (sig == SIGALRM) {
         perror("timeout") ;
         if (kill(child_pid, SIGINT) == -1) {
-            perror("timeout_handler: kill") ;
             remove_shared_mem_from_conf() ;
-            exit(1) ;   // Q.
+            PFATAL("timeout_handler: kill") ;
         }
     }
 }
@@ -123,17 +122,15 @@ execute_target (void * mem, u32 len)
     if (conf->input_type == STDIN) {
         char * args[] = { conf->bin_path, (char *)0x0 } ;
         if (execv(conf->bin_path, args) == -1) {
-            perror("execute_target: execv") ;
             remove_shared_mem_from_conf() ;
-            exit(1) ;
+            PFATAL("execute_target: execv") ;
         }
     } 
     else if (conf->input_type == ARG_FILENAME) {
         char * args[] = { conf->bin_path, conf->input_file, (char *)0x0 } ;
         if (execv(conf->bin_path, args) == -1) {
-            perror("execute_target: execv") ;
             remove_shared_mem_from_conf() ;
-            exit(1) ;
+            PFATAL("execute_target: execv") ;
         }
     }
 }
@@ -177,9 +174,8 @@ run (void * mem, u32 len)
     return exit_code ;
 
 pipe_err:
-    perror("run: pipe") ;
     remove_shared_mem_from_conf() ;
-    exit(1) ;
+    PFATAL("run: pipe") ;
 }
 
 void
@@ -209,9 +205,8 @@ write_covered_funs_csv(char * funcov_dir_path)
 
     FILE * fp = fopen(funcov_file_path, "wb") ;
     if (fp == 0x0) {
-        perror("write_covered_funs_csv: fopen") ;
         remove_shared_mem_from_conf() ;
-        exit(1) ;
+        PFATAL("write_covered_funs_csv: fopen") ;
     }
 
     fprintf(fp, "callee,caller,pc_val\n") ; 
@@ -242,4 +237,10 @@ funcov (afl_state_t * afl, void * mem, u32 len, u8 * seed_path)
     write_covered_funs_csv(funcov_dir_path) ;
 
     return 0 ;
+}
+
+int 
+get_seeds_for_func (afl_state_t * afl)
+{
+
 }
