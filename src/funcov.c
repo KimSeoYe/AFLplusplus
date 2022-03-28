@@ -24,10 +24,17 @@ funcov_t * conf ;
 */
 
 void
-funcov_shm_deinit (afl_state_t * afl)   // TODO. design
+funcov_shm_deinit (afl_state_t * afl)   
 {
     detatch_shm((void *)(afl->funcov.curr_stat)) ;
     remove_shm(afl->funcov.shmid) ;
+}
+
+void 
+shm_deinit ()
+{
+    funcov_shm_deinit(afl) ;
+    afl_shm_deinit(&afl->shm);
 }
 
 void
@@ -86,8 +93,7 @@ timeout_handler (int sig)
     if (sig == SIGALRM) {
         perror("timeout") ;
         if (kill(child_pid, SIGINT) == -1) {
-            detatch_shm((void *)(conf->curr_stat)) ;    // TODO.
-            remove_shm(conf->shmid) ;
+            shm_deinit() ;
             PFATAL("timeout_handler: kill") ;
         }
     }
@@ -101,8 +107,7 @@ execute_target (void * mem, u32 len)
     if (conf->input_type == STDIN) {
         u32 s = write(stdin_pipe[1], mem, len) ;
         if (s != len) {
-            funcov_shm_deinit(afl) ;
-            afl_shm_deinit(&afl->shm);
+            shm_deinit() ;
             PFATAL("funcov: short write") ;
         }
     }
@@ -123,16 +128,14 @@ execute_target (void * mem, u32 len)
     if (conf->input_type == STDIN) {
         char * args[] = { conf->bin_path, (char *)0x0 } ;
         if (execv(conf->bin_path, args) == -1) {
-            funcov_shm_deinit(afl) ;
-            afl_shm_deinit(&afl->shm);
+            shm_deinit() ;
             PFATAL("execute_target: execv") ;
         }
     } 
     else if (conf->input_type == ARG_FILENAME) {
         char * args[] = { conf->bin_path, conf->input_file, (char *)0x0 } ;
         if (execv(conf->bin_path, args) == -1) {
-            funcov_shm_deinit(afl) ;
-            afl_shm_deinit(&afl->shm);
+            shm_deinit() ;
             PFATAL("execute_target: execv") ;
         }
     }
@@ -167,8 +170,7 @@ run (void * mem, u32 len)
         close_pipes() ;
     }
     else {
-        funcov_shm_deinit(afl) ;
-        afl_shm_deinit(&afl->shm);
+        shm_deinit() ;
         PFATAL("run: fork") ;
     }
 
@@ -178,8 +180,7 @@ run (void * mem, u32 len)
     return exit_code ;
 
 pipe_err:
-    funcov_shm_deinit(afl) ;
-    afl_shm_deinit(&afl->shm);
+    shm_deinit() ;
     PFATAL("run: pipe") ;
 }
 
@@ -210,8 +211,7 @@ write_covered_funs_csv(char * funcov_dir_path)
 
     FILE * fp = fopen(funcov_file_path, "wb") ;
     if (fp == 0x0) {
-        funcov_shm_deinit(afl) ;
-        afl_shm_deinit(&afl->shm);
+        shm_deinit() ;
         PFATAL("write_covered_funs_csv: fopen") ;
     }
 
@@ -243,44 +243,29 @@ funcov (void * mem, u32 len, u8 * seed_path)
     return 0 ;
 }
 
-void
-initialize_seeds_map (u8 ** map, int row, int col, afl_state_t * afl)
-{
-    map = (u8 **) malloc(sizeof(u8) * row) ;
-    if (map == 0x0) {
-        funcov_shm_deinit(afl) ;
-        afl_shm_deinit(&afl->shm);
-        PFATAL("Failed to allocate memory for a seed map") ;
-    }
-    for (int i = 0; i < row; i++) {
-        map[i] = (u8 *) malloc(sizeof(u8) * col) ;
-        if (map[i] == 0x0) {
-            funcov_shm_deinit(afl) ;
-            afl_shm_deinit(&afl->shm);
-            PFATAL("Failed to allocate memory for a seed map") ;
-        }
-    }
-    memset(map, 0, sizeof(u8) * row * col) ;
-}
-
-void
-deallocate_seeds_map (u8 ** map, int row)
-{
-    for (int i = 0; i < row; i++) {
-        if (map[i] != 0x0) free(map[i]) ;
-    }
-    free(map) ;
-}
-
 int 
 get_seeds_for_func ()
 {
-    u8 ** seeds_per_func_map ;
-    initialize_seeds_map(seeds_per_func_map, FUNCOV_MAP_SIZE, afl->queued_items, afl) ;
+    u8 ** seeds_per_func_map = (u8 **) malloc(sizeof(u8 *) * FUNCOV_MAP_SIZE) ; // TODO. too large map size
+    if (seeds_per_func_map == 0x0) {
+        shm_deinit() ;
+        PFATAL("Failed to allocate memory for a seed map") ;
+    }
+    for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
+        seeds_per_func_map[i] = (u8 *) malloc(sizeof(u8) * afl->queued_items) ;
+        if (seeds_per_func_map[i] == 0x0) {
+            shm_deinit() ;
+            PFATAL("Failed to allocate memory for a seed map") ;
+        }
+        seeds_per_func_map[i] = 0 ;
+    }
     
     /* Implementation */
 
-    deallocate_seeds_map(seeds_per_func_map, FUNCOV_MAP_SIZE, afl->queued_items) ;
+    for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
+        if (seeds_per_func_map[i] != 0x0) free(seeds_per_func_map[i]) ;
+    }
+    free(seeds_per_func_map) ;
 
     return 0 ;
 }
