@@ -27,6 +27,7 @@
 #include "cmplog.h"
 #include <limits.h>
 #include <stdlib.h>
+#include <getopt.h>
 #ifndef USEMMAP
   #include <sys/mman.h>
   #include <sys/stat.h>
@@ -533,13 +534,24 @@ int main(int argc, char **argv_orig, char **envp) {
 
   afl->shmem_testcase_mode = 1;  // we always try to perform shmem fuzzing
 
+  int opt_idx = 0 ;
+  static struct option long_options[] = {
+      {"funcov", 0, 0, 0 },
+      { 0, 0, 0, 0 }
+  };
+
   while (
-      (opt = getopt(
+      (opt = getopt_long(
            argc, argv,
-           "+Ab:B:c:CdDe:E:hi:I:f:F:g:G:l:L:m:M:nNOo:p:RQs:S:t:T:UV:vWXx:YZ")) >
+           "+Ab:B:c:CdDe:E:hi:I:f:F:g:G:l:L:m:M:nNOo:p:RQs:S:t:T:UV:WXx:YZ", long_options, &opt_idx)) >=
       0) {
 
     switch (opt) {
+      case 0:
+        if (strcmp(long_options[opt_idx].name, "funcov") == 0) {
+          afl->funcov_mode = 1 ;
+        }  
+        break ;
 
       case 'g':
         afl->min_length = atoi(optarg);
@@ -1268,10 +1280,6 @@ int main(int argc, char **argv_orig, char **envp) {
             "(custom_mutators/radamsa/).");
 
         break;
-
-      case 'v':
-        afl->funcov_mode = 1 ;  // TODO. long option
-        break ;
 
       default:
         if (!show_help) { show_help = 1; }

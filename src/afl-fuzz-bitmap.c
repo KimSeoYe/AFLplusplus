@@ -500,7 +500,7 @@ save_if_interesting(afl_state_t *afl, void *mem, u32 len, u8 fault) {
     ck_write(fd, mem, len, queue_fn);
     close(fd);
     add_to_queue(afl, queue_fn, len, 0);
-    funcov(afl, mem, len, queue_fn) ; 
+    if (afl->funcov_mode) funcov(afl, mem, len, queue_fn) ; 
 
 #ifdef INTROSPECTION
     if (afl->custom_mutators_count && afl->current_custom_fuzz) {
