@@ -29,6 +29,13 @@ remove_shared_mem (afl_state_t * afl)
 }
 
 void
+remove_shared_mem_from_conf ()
+{
+    detatch_shm((void *)(conf->curr_stat)) ;
+    remove_shm(conf->shmid) ;
+}
+
+void
 shm_init (afl_state_t * afl)
 {
     afl->funcov.shmid = get_shm(INIT, sizeof(cov_stat_t)) ;
@@ -82,7 +89,7 @@ timeout_handler (int sig)
         perror("timeout") ;
         if (kill(child_pid, SIGINT) == -1) {
             perror("timeout_handler: kill") ;
-            // remove_shared_mem(afl) ;
+            remove_shared_mem_from_conf() ;
             exit(1) ;   // Q.
         }
     }
@@ -117,7 +124,7 @@ execute_target (void * mem, u32 len)
         char * args[] = { conf->bin_path, (char *)0x0 } ;
         if (execv(conf->bin_path, args) == -1) {
             perror("execute_target: execv") ;
-            // remove_shared_mem(afl) ;
+            remove_shared_mem_from_conf() ;
             exit(1) ;
         }
     } 
@@ -125,7 +132,7 @@ execute_target (void * mem, u32 len)
         char * args[] = { conf->bin_path, conf->input_file, (char *)0x0 } ;
         if (execv(conf->bin_path, args) == -1) {
             perror("execute_target: execv") ;
-            // remove_shared_mem(afl) ;
+            remove_shared_mem_from_conf() ;
             exit(1) ;
         }
     }
@@ -171,7 +178,7 @@ run (void * mem, u32 len)
 
 pipe_err:
     perror("run: pipe") ;
-    // remove_shared_mem(afl) ;
+    remove_shared_mem_from_conf() ;
     exit(1) ;
 }
 
@@ -203,51 +210,19 @@ write_covered_funs_csv(char * funcov_dir_path)
     FILE * fp = fopen(funcov_file_path, "wb") ;
     if (fp == 0x0) {
         perror("write_covered_funs_csv: fopen") ;
-        // remove_shared_mem(afl) ;
+        remove_shared_mem_from_conf() ;
         exit(1) ;
     }
 
-    fprintf(fp, "callee,caller,pc_val,called_location\n") ; 
+    fprintf(fp, "callee,caller,pc_val\n") ; 
     for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
         if (conf->curr_stat->map[i].hit_count == 0) continue ;
             
-        fprintf(fp, "%s,", conf->curr_stat->map[i].cov_string) ; 
-        
-        // char location[PATH_MAX] ;
-        // if (find_location_info(location, translated_locations, cov_stats[turn].map[i].cov_string) == -1) {
-        //     remove_shared_mem(afl) ;
-        //     exit(1) ;
-        // }
-        // fprintf(fp, "%s\n", location) ;
-        fprintf(fp, "\n") ;
+        fprintf(fp, "%s\n", conf->curr_stat->map[i].cov_string) ; 
     }
 
     fclose(fp) ;
 }
-
-// void
-// save_final_results ()
-// {
-//     location_t * translated_locations = (location_t *) malloc(sizeof(location_t) *  FUNCOV_MAP_SIZE) ;
-//     if (translated_locations == 0x0) {
-//         perror("save_final_results: malloc") ;
-//         remove_shared_mem(afl) ;
-//         exit(1) ;
-//     }
-//     memset(translated_locations, 0, sizeof(location_t) * FUNCOV_MAP_SIZE) ;
-
-//     int translate_success = translate_pc_values(translated_locations, afl->funcov.curr_stat->fun_coverage, afl->funcov.curr_stat->map, afl->funcov.bin_path) ;
-//     if (translate_success == -1) {
-//         remove_shared_mem(afl) ;
-//         exit(1) ;
-//     }
-
-//     char funcov_dir_path[PATH_MAX + 32] ;
-//     sprintf(funcov_dir_path, "%s/funcov_per_seed", afl->funcov.out_dir) ;
-//     write_covered_funs_csv(funcov_dir_path, translated_locations) ; // TODO. translated_locations
-
-//     free(translated_locations) ;
-// }
 
 
 int
