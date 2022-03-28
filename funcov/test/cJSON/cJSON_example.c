@@ -36,15 +36,21 @@ simple_parse_and_print (char * input)
 int
 main (int argc, char * argv[])
 {
-    char * input = (char *) malloc(sizeof(char) * BUF_SIZE) ;
+	int buf_block_cnt = 1 ;
+    char * input = (char *) malloc(sizeof(char) * BUF_SIZE * buf_block_cnt) ;
     char c ;
     int input_len ;
     for (input_len = 0; (c = getchar()) != EOF && c != 4; input_len++) {    // 3 : ctrl+D
         if ((input_len + 1) % BUF_SIZE == 0 && input_len != 0) {
-            input = realloc(input, sizeof(char) * BUF_SIZE * (BUF_SIZE / (input_len + 1) + 1)) ;
+			buf_block_cnt++;
+            input = realloc(input, sizeof(char) * BUF_SIZE * buf_block_cnt) ;
         }
         input[input_len] = c ;
     }
+	
+	if (input_len >= BUF_SIZE * buf_block_cnt) {
+		input = realloc(input, sizeof(char) * (BUF_SIZE * buf_block_cnt + 1)) ;
+	}
     input[input_len] = 0x0 ;
     
 #ifdef DEBUG
