@@ -11,7 +11,9 @@
 
 #include "../include/afl-fuzz.h"
 
+afl_state_t * afl ;
 funcov_t * conf ;
+
 
 /**
  * TODO.
@@ -22,17 +24,10 @@ funcov_t * conf ;
 */
 
 void
-remove_shared_mem (afl_state_t * afl)
+funcov_shm_deinit (afl_state_t * afl)   // TODO. design
 {
     detatch_shm((void *)(afl->funcov.curr_stat)) ;
     remove_shm(afl->funcov.shmid) ;
-}
-
-void
-remove_shared_mem_from_conf ()
-{
-    detatch_shm((void *)(conf->curr_stat)) ;
-    remove_shm(conf->shmid) ;
 }
 
 void
@@ -44,8 +39,11 @@ shm_init (afl_state_t * afl)    // TODO. if get/attatch shm failed?
 }
 
 void 
-funcov_init (afl_state_t * afl)
+funcov_init (afl_state_t * init_afl)
 {
+    afl = init_afl ;
+    conf = &(afl->funcov) ;
+
     if (afl->fsrv.use_stdin) afl->funcov.input_type = STDIN ;
     else afl->funcov.input_type = ARG_FILENAME ;
 
@@ -88,7 +86,8 @@ timeout_handler (int sig)
     if (sig == SIGALRM) {
         perror("timeout") ;
         if (kill(child_pid, SIGINT) == -1) {
-            remove_shared_mem_from_conf() ;
+            detatch_shm((void *)(conf->curr_stat)) ;    // TODO.
+            remove_shm(conf->shmid) ;
             PFATAL("timeout_handler: kill") ;
         }
     }
@@ -102,6 +101,8 @@ execute_target (void * mem, u32 len)
     if (conf->input_type == STDIN) {
         u32 s = write(stdin_pipe[1], mem, len) ;
         if (s != len) {
+            funcov_shm_deinit(afl) ;
+            afl_shm_deinit(&afl->shm);
             PFATAL("funcov: short write") ;
         }
     }
@@ -122,14 +123,16 @@ execute_target (void * mem, u32 len)
     if (conf->input_type == STDIN) {
         char * args[] = { conf->bin_path, (char *)0x0 } ;
         if (execv(conf->bin_path, args) == -1) {
-            remove_shared_mem_from_conf() ;
+            funcov_shm_deinit(afl) ;
+            afl_shm_deinit(&afl->shm);
             PFATAL("execute_target: execv") ;
         }
     } 
     else if (conf->input_type == ARG_FILENAME) {
         char * args[] = { conf->bin_path, conf->input_file, (char *)0x0 } ;
         if (execv(conf->bin_path, args) == -1) {
-            remove_shared_mem_from_conf() ;
+            funcov_shm_deinit(afl) ;
+            afl_shm_deinit(&afl->shm);
             PFATAL("execute_target: execv") ;
         }
     }
@@ -164,8 +167,9 @@ run (void * mem, u32 len)
         close_pipes() ;
     }
     else {
-        perror("run: fork") ;
-        exit(1) ;
+        funcov_shm_deinit(afl) ;
+        afl_shm_deinit(&afl->shm);
+        PFATAL("run: fork") ;
     }
 
     int exit_code ;
@@ -174,7 +178,8 @@ run (void * mem, u32 len)
     return exit_code ;
 
 pipe_err:
-    remove_shared_mem_from_conf() ;
+    funcov_shm_deinit(afl) ;
+    afl_shm_deinit(&afl->shm);
     PFATAL("run: pipe") ;
 }
 
@@ -205,14 +210,14 @@ write_covered_funs_csv(char * funcov_dir_path)
 
     FILE * fp = fopen(funcov_file_path, "wb") ;
     if (fp == 0x0) {
-        remove_shared_mem_from_conf() ;
+        funcov_shm_deinit(afl) ;
+        afl_shm_deinit(&afl->shm);
         PFATAL("write_covered_funs_csv: fopen") ;
     }
 
     fprintf(fp, "callee,caller,pc_val\n") ; 
     for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
-        if (conf->curr_stat->map[i].hit_count == 0) continue ;
-            
+        if (conf->curr_stat->map[i].hit_count == 0) continue ; 
         fprintf(fp, "%s\n", conf->curr_stat->map[i].cov_string) ; 
     }
 
@@ -221,12 +226,11 @@ write_covered_funs_csv(char * funcov_dir_path)
 
 
 int
-funcov (afl_state_t * afl, void * mem, u32 len, u8 * seed_path) 
+funcov (void * mem, u32 len, u8 * seed_path) 
 {
     signal(SIGALRM, timeout_handler) ;
     
     strcpy(afl->funcov.input_file, seed_path) ;
-    conf = &(afl->funcov) ;
     
     int exit_code = run(mem, len) ;
     conf->curr_stat->exit_code = exit_code ;
@@ -239,8 +243,44 @@ funcov (afl_state_t * afl, void * mem, u32 len, u8 * seed_path)
     return 0 ;
 }
 
-int 
-get_seeds_for_func (afl_state_t * afl)
+void
+initialize_seeds_map (u8 ** map, int row, int col, afl_state_t * afl)
 {
+    map = (u8 **) malloc(sizeof(u8) * row) ;
+    if (map == 0x0) {
+        funcov_shm_deinit(afl) ;
+        afl_shm_deinit(&afl->shm);
+        PFATAL("Failed to allocate memory for a seed map") ;
+    }
+    for (int i = 0; i < row; i++) {
+        map[i] = (u8 *) malloc(sizeof(u8) * col) ;
+        if (map[i] == 0x0) {
+            funcov_shm_deinit(afl) ;
+            afl_shm_deinit(&afl->shm);
+            PFATAL("Failed to allocate memory for a seed map") ;
+        }
+    }
+    memset(map, 0, sizeof(u8) * row * col) ;
+}
 
+void
+deallocate_seeds_map (u8 ** map, int row)
+{
+    for (int i = 0; i < row; i++) {
+        if (map[i] != 0x0) free(map[i]) ;
+    }
+    free(map) ;
+}
+
+int 
+get_seeds_for_func ()
+{
+    u8 ** seeds_per_func_map ;
+    initialize_seeds_map(seeds_per_func_map, FUNCOV_MAP_SIZE, afl->queued_items, afl) ;
+    
+    /* Implementation */
+
+    deallocate_seeds_map(seeds_per_func_map, FUNCOV_MAP_SIZE, afl->queued_items) ;
+
+    return 0 ;
 }

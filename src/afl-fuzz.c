@@ -2533,6 +2533,11 @@ stop_fuzzing:
   write_bitmap(afl);
   save_auto(afl);
 
+  /* FUNCOV */
+  if (afl->funcov_mode) {
+    get_seeds_for_func() ;
+  }
+
   SAYF(CURSOR_SHOW cLRD "\n\n+++ Testing aborted %s +++\n" cRST,
        afl->stop_soon == 2 ? "programmatically" : "by user");
 
@@ -2596,7 +2601,7 @@ stop_fuzzing:
   destroy_extras(afl);
   destroy_custom_mutators(afl);
   afl_shm_deinit(&afl->shm);
-  remove_shared_mem (afl) ;
+  funcov_shm_deinit(afl) ;
 
   if (afl->shm_fuzz) {
 

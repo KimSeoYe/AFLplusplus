@@ -991,9 +991,10 @@ struct custom_mutator {
 };
 
 /* FUNCOV */
-void remove_shared_mem (afl_state_t * afl) ; // TODO. pass only shm (curr_stat)
-void funcov_init (afl_state_t * afl) ;
-int funcov (afl_state_t * afl, void * mem, u32 len, u8 * seed_path) ;
+void funcov_shm_deinit (afl_state_t * afl) ; // TODO. pass only shm (curr_stat)
+void funcov_init (afl_state_t * init_afl) ;
+int funcov (void * mem, u32 len, u8 * seed_path) ;
+int get_seeds_for_func () ;
 
 void afl_state_init(afl_state_t *, uint32_t map_size);
 void afl_state_deinit(afl_state_t *);

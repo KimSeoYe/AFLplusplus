@@ -24,6 +24,9 @@ typedef struct funcov {
     cov_stat_t * curr_stat ; // shm
 } funcov_t ;
 
-
+typedef struct funmap_entry {
+    u8 exist ;
+    char filename[PATH_MAX] ;
+} funmap_entry_t ;
 
 #endif
