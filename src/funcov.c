@@ -54,6 +54,10 @@ funcov_init (afl_state_t * init_afl)
     if (afl->fsrv.use_stdin) afl->funcov.input_type = STDIN ;
     else afl->funcov.input_type = ARG_FILENAME ;
 
+    if (afl->funcov.input_type == ARG_FILENAME) {
+        sprintf(afl->funcov.input_file, "%s", afl->fsrv.out_file) ; // TODO. out_file path?
+    }
+
     int position = -1 ;
     for (int i = strlen(afl->fsrv.target_path) - 1; i >= 0; i--) {
         if (afl->fsrv.target_path[i] == '/') {
