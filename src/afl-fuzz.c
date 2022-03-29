@@ -2601,7 +2601,7 @@ stop_fuzzing:
   destroy_extras(afl);
   destroy_custom_mutators(afl);
   afl_shm_deinit(&afl->shm);
-  funcov_shm_deinit(afl) ;
+  if (afl->funcov_mode) funcov_shm_deinit(afl) ;
 
   if (afl->shm_fuzz) {
 
