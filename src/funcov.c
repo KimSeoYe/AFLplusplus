@@ -243,6 +243,31 @@ funcov (void * mem, u32 len, u8 * seed_path)
     return 0 ;
 }
 
+int
+find_fun_id (name_entry_t * func_names, char * callee_name)
+{
+    int found = 0 ;
+    int fun_id = hash16(callee_name) ;
+    for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
+        if (fun_id >= FUNCOV_MAP_SIZE) fun_id = 0 ;
+        if (func_names[fun_id].exist && strcmp(callee_name, func_names[fun_id].name) != 0) fun_id++ ;
+        else {
+            if (!func_names[fun_id].exist) {
+                strcpy(func_names[fun_id].name, callee_name) ;
+                func_names[fun_id].exist = 1 ;
+            }
+            found = 1 ;
+            break ;
+        }
+    }
+    if (!found) {
+        shm_deinit() ;
+        PFATAL("Map overflow") ;
+    }
+
+    return fun_id ;
+}
+
 
 void
 read_queued_inputs (u8 ** seeds_per_func_map, char ** seed_names, name_entry_t * func_names)
@@ -279,29 +304,10 @@ read_queued_inputs (u8 ** seeds_per_func_map, char ** seed_names, name_entry_t *
                     continue ;
                 }
                 
-                int found = 0 ;
                 char * callee_name = strtok(buf, ",") ;
-                int fun_id = hash16(callee_name) ;
-                
-                for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
-                    if (fun_id >= FUNCOV_MAP_SIZE) fun_id = 0 ;
-                    if (func_names[fun_id].exist && strcmp(callee_name, func_names[fun_id].name) != 0) fun_id++ ;
-                    else {
-                        if (!func_names[fun_id].exist) {
-                            strcpy(func_names[fun_id].name, callee_name) ;
-                            func_names[fun_id].exist = 1 ;
-                        }
-                        seeds_per_func_map[fun_id][seed_id] = 1 ;
-                        found = 1 ;
-                        break ;
-                    }
-                }
-                if (!found) {
-                    shm_deinit() ;
-                    PFATAL("Map overflow") ;
-                }
+                int fun_id = find_fun_id(func_names, callee_name) ;
+                seeds_per_func_map[fun_id][seed_id] = 1 ;
             }
-
             seed_id++ ;
             fclose(fp) ;
         }
