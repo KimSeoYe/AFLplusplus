@@ -31,6 +31,9 @@
   #define NAME_MAX _XOPEN_NAME_MAX
 #endif
 
+#define EXIT_AT_TARGET_CORPUS_CNT
+#define TARGET_COUPUS_CNT 847 /* FUNCOV */
+
 /* Write bitmap to file. The bitmap is useful mostly for the secret
    -B option, to focus a separate fuzzing session on a particular
    interesting input without rediscovering all the others. */
@@ -501,6 +504,10 @@ save_if_interesting(afl_state_t *afl, void *mem, u32 len, u8 fault) {
     close(fd);
     add_to_queue(afl, queue_fn, len, 0);
     if (afl->funcov_mode) funcov(mem, len, queue_fn) ; 
+
+#ifdef EXIT_AT_TARGET_CORPUS_CNT
+  if (afl->queued_items == TARGET_COUPUS_CNT) PFATAL("Exit at target corpus cnt: %d", TARGET_COUPUS_CNT) ;
+#endif
 
 #ifdef INTROSPECTION
     if (afl->custom_mutators_count && afl->current_custom_fuzz) {
