@@ -11,8 +11,8 @@
 
 #include "../include/afl-fuzz.h"
 
-afl_state_t * afl ;
-funcov_t * conf ;
+static afl_state_t * afl ;
+static funcov_t * conf ;
 
 
 /**
@@ -49,7 +49,7 @@ void
 funcov_init (afl_state_t * init_afl)
 {
     afl = init_afl ;
-    conf = &(afl->funcov) ;
+    conf = &(afl->funcov) ; // Q. position?
 
     if (afl->fsrv.use_stdin) afl->funcov.input_type = STDIN ;
     else afl->funcov.input_type = ARG_FILENAME ;
@@ -243,29 +243,137 @@ funcov (void * mem, u32 len, u8 * seed_path)
     return 0 ;
 }
 
+
+void
+read_queued_inputs (u8 ** seeds_per_func_map, char ** seed_names, name_entry_t * func_names)
+{
+    DIR * dir_ptr = 0x0 ;
+    struct dirent * entry = 0x0 ;
+
+    char src_dir[PATH_MAX] ;
+    sprintf(src_dir, "%s/funcov_per_seed", conf->out_dir) ;
+    if ((dir_ptr = opendir(src_dir)) == 0x0) {
+        shm_deinit() ;
+        PFATAL("Failed to open %s", src_dir) ;
+    }
+
+    u32 seed_id = 0 ;
+    while ((entry = readdir(dir_ptr)) != 0x0) {
+        if (entry->d_name[0] != '.') {
+
+            char seed_path[PATH_MAX] ;
+            sprintf(seed_path, "%s/%s", src_dir, entry->d_name) ;
+            strcpy(seed_names[seed_id], entry->d_name) ;
+            
+            FILE * fp = fopen(seed_path, "rb") ;
+            if (fp == 0x0) {
+                shm_deinit() ;
+                PFATAL("Failed to open %s", entry->d_name) ;
+            }
+
+            char buf[BUF_SIZE] ;
+            int first = 1 ;
+            while (fgets(buf, BUF_SIZE, fp) != NULL) {
+                if (first) {
+                    first = 0 ; 
+                    continue ;
+                }
+                
+                int found = 0 ;
+                char * callee_name = strtok(buf, ",") ;
+                int fun_id = hash16(callee_name) ;
+                
+                for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
+                    if (fun_id >= FUNCOV_MAP_SIZE) fun_id = 0 ;
+                    if (func_names[fun_id].exist && strcmp(callee_name, func_names[fun_id].name) != 0) fun_id++ ;
+                    else {
+                        if (!func_names[fun_id].exist) {
+                            strcpy(func_names[fun_id].name, callee_name) ;
+                            func_names[fun_id].exist = 1 ;
+                        }
+                        seeds_per_func_map[fun_id][seed_id] = 1 ;
+                        found = 1 ;
+                        break ;
+                    }
+                }
+                if (!found) {
+                    shm_deinit() ;
+                    PFATAL("Map overflow") ;
+                }
+            }
+
+            seed_id++ ;
+            fclose(fp) ;
+        }
+    }
+    
+    if (closedir(dir_ptr) == -1) {
+        shm_deinit() ;
+        PFATAL("Failed to open %s\n", src_dir) ;
+    }
+
+}
+
+void
+write_seeds_per_func_map (u8 ** seeds_per_func_map, char ** seed_names, name_entry_t * func_names)
+{
+    for (int fun_id = 0; fun_id < FUNCOV_MAP_SIZE; fun_id++) {
+        if (func_names[fun_id].exist) {
+            char dst_path[PATH_MAX] ;
+            sprintf(dst_path, "%s/seed_per_func/%s.csv", conf->out_dir, func_names[fun_id].name) ;
+            
+            FILE * fp = fopen(dst_path, "wb") ;
+            if (fp == 0x0) {
+                shm_deinit() ;
+                PFATAL("Failed to open %s", dst_path) ;
+            }
+            for (u32 seed_id = 0; seed_id < afl->queued_items; seed_id++) {
+                if (seeds_per_func_map[fun_id][seed_id]) {
+                    fprintf(fp, "%s\n", seed_names[seed_id]) ;
+                }
+            }
+            fclose(fp) ;
+        }
+    }
+}
+
 int 
 get_seeds_for_func ()
 {
+    name_entry_t * func_names = malloc(sizeof(name_entry_t) * FUNCOV_MAP_SIZE) ;
+    if (func_names == 0x0) goto alloc_failed ;
+    memset(func_names, 0, sizeof(name_entry_t) * FUNCOV_MAP_SIZE) ;
+    
     u8 ** seeds_per_func_map = (u8 **) malloc(sizeof(u8 *) * FUNCOV_MAP_SIZE) ; // TODO. too large map size
-    if (seeds_per_func_map == 0x0) {
-        shm_deinit() ;
-        PFATAL("Failed to allocate memory for a seed map") ;
-    }
-    for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
+    if (seeds_per_func_map == 0x0) goto alloc_failed ;
+    for (u32 i = 0; i < FUNCOV_MAP_SIZE; i++) {
         seeds_per_func_map[i] = (u8 *) malloc(sizeof(u8) * afl->queued_items) ;
-        if (seeds_per_func_map[i] == 0x0) {
-            shm_deinit() ;
-            PFATAL("Failed to allocate memory for a seed map") ;
-        }
-        seeds_per_func_map[i] = 0 ;
+        if (seeds_per_func_map[i] == 0x0) goto alloc_failed ;
+        memset(seeds_per_func_map[i], 0, sizeof(u8) * afl->queued_items) ;
+    }
+
+    char ** seed_names = (char **) malloc(sizeof(char *) * afl->queued_items) ;
+    for (u32 i = 0; i < afl->queued_items; i++) {
+        seed_names[i] = (char *) malloc(sizeof(char) * PATH_MAX) ;
+        if (seed_names[i] == 0x0) goto alloc_failed ;
     }
     
-    /* Implementation */
+    read_queued_inputs(seeds_per_func_map, seed_names, func_names) ;
+    write_seeds_per_func_map(seeds_per_func_map, seed_names, func_names) ;
 
-    for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
-        if (seeds_per_func_map[i] != 0x0) free(seeds_per_func_map[i]) ;
+    for (u32 i = 0; i < FUNCOV_MAP_SIZE; i++) {
+        free(seeds_per_func_map[i]) ;
+    }
+    for (u32 i = 0; i < afl->queued_items; i++) {
+        free(seed_names[i]) ;
     }
     free(seeds_per_func_map) ;
+    free(seed_names) ;
+    free(func_names) ;
 
     return 0 ;
+
+alloc_failed:
+    shm_deinit() ;
+    PFATAL("Failed to allocate memory for a seed map") ;
 }
