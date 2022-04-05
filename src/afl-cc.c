@@ -31,6 +31,8 @@
 #include <strings.h>
 #include <limits.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #if (LLVM_MAJOR - 0 == 0)
   #undef LLVM_MAJOR
@@ -1141,6 +1143,26 @@ static void edit_params(u32 argc, char **argv, char **envp) {
 
 }
 
+static char *
+alloc_funcov_binary_name (char * src_path)
+{
+  int position = -1 ;
+  for (int i = strlen(src_path) - 1; i >= 0; i--) {
+      if (src_path[i] == '/') {
+          position = i ;
+          break ;
+      }
+  }
+  if (position > 0) {
+      char dir_path[PATH_MAX] ;
+      strncpy(dir_path, src_path, position) ; 
+      dir_path[position] = '\0' ;
+      return alloc_printf("%s/.%s", dir_path, src_path + position + 1) ;
+  }
+  else {
+      return alloc_printf(".%s", src_path) ;
+  }
+}
 
 // FUNCOV
 static u8 **func_params ; 
@@ -1167,6 +1189,7 @@ edit_func_params (u32 argc)
       f_skip_next = 0 ;
       continue ;
     }
+    if (strncmp(cc_params[i], "-O3", strlen("-O3")) == 0) continue ;
     if (strncmp(cc_params[i], "-g", strlen("-g")) == 0) continue ;
     if (strncmp(cc_params[i], "-rdynamic", strlen("-rdynamic")) == 0) continue ;
     if (strncmp(cc_params[i], "-fsanitize=fuzzer", strlen("-fsanitize=fuzzer")) == 0) continue ;
@@ -1177,11 +1200,13 @@ edit_func_params (u32 argc)
 
   func_params[func_par_cnt++] = "-fsanitize=address" ; // TODO. if already exist?
   func_params[func_par_cnt++] = "-fsanitize-coverage=func,trace-pc-guard" ;
-  func_params[func_par_cnt++] = alloc_printf("%s/funcov_trace_pc_guard.o", obj_path) ;
-  func_params[func_par_cnt++] = alloc_printf("%s/funcov_shm_coverage.o", obj_path) ; // TODO.
+  if (!shared_linking && !partial_linking && !wasm_linking) { 
+    func_params[func_par_cnt++] = alloc_printf("%s/funcov_trace_pc_guard.o", obj_path) ;
+    func_params[func_par_cnt++] = alloc_printf("%s/funcov_shm_coverage.o", obj_path) ; // TODO.
+  }
   func_params[func_par_cnt++] = "-o" ;
   if (o_idx != 0) {
-    func_params[func_par_cnt++] = alloc_printf(".%s", cc_params[o_idx + 1]) ;
+    func_params[func_par_cnt++] = alloc_funcov_binary_name(cc_params[o_idx + 1]) ;
   }
   else {
     func_params[func_par_cnt++] = FUNCOV_BIN_DEFAULT ;
@@ -2203,23 +2228,31 @@ int main(int argc, char **argv, char **envp) {
     argv[0] = cc_params[0];
     execvp(cc_params[0], (char **)argv);
 
-  } else {
+  } 
+  else {
     int child_pid = fork() ;
 
     if (child_pid == 0) {
-      execvp(cc_params[0], (char **)cc_params);
-    }
-    else if (child_pid > 0) {
       execvp(func_params[0], (char **)func_params);
     }
-    else {
-      FATAL("ERROR: afl-cc: fork()");
-    }
-  }
+    else if (child_pid > 0) {
+      int second_pid = fork() ;
+      if (second_pid == 0) {
+        execvp(cc_params[0], (char **)cc_params);
+      }
+      else if (second_pid < 0) goto fork_err ;
 
-  FATAL("Oops, failed to execute '%s' - check your PATH", cc_params[0]);
+      wait(0x0) ;
+      wait(0x0) ;
+    } 
+    else goto fork_err ;
+  }
+ 
+  // FATAL("Oops, failed to execute '%s' - check your PATH", cc_params[0]);
 
   return 0;
 
+fork_err:
+  FATAL("ERROR: afl-cc: fork()");
 }
 
