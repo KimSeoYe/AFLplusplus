@@ -7,7 +7,7 @@
 
 #include "../include/funcov_shm_coverage.h"  
 
-#define BT_BUF_SIZE 5
+// #define BT_BUF_SIZE 5
 #define STR_BUFF 512
 
 static cov_stat_t * curr_stat ; // shm
@@ -74,53 +74,36 @@ parse_string (char * cov_string, char ** strings)
 	return 1 ;
 }
 
-// unsigned short
-// hash16 (char * cov_string)  // TODO. not tested
-// {
-// 	unsigned int h = 0 ;
-
-// 	while (*cov_string) {
-// 		h = h * 23131 + (unsigned char)*cov_string++ ;
-// 	}
-
-// 	return (h & 0xffff) ;
-// }
-
 void
-get_coverage (char ** strings)
+get_coverage (char * cov_string)
 {
 	curr_stat = attatch_shm(curr_stat_shmid) ;
 
-	char cov_string[BUF_SIZE] ;
-	int parse_success = parse_string(cov_string, strings) ; 
+	unsigned int id = hash16(cov_string) ;
 
-	if (parse_success) {
-		unsigned int id = hash16(cov_string) ;
-
-		int found = 0 ;
-		for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
-			if (id >= FUNCOV_MAP_SIZE) {
-				id = 0 ;
-				continue ;
-			}
-
-			if (curr_stat->map[id].hit_count == 0) {
-				strcpy(curr_stat->map[id].cov_string, cov_string) ;
-				curr_stat->map[id].hit_count++ ;
-				found = 1 ;
-				break ;
-			}
-			else if (strcmp(curr_stat->map[id].cov_string, cov_string) == 0) {
-				curr_stat->map[id].hit_count++ ;
-				found = 1 ;
-				break ;
-			}
-			else id++ ;
+	int found = 0 ;
+	for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
+		if (id >= FUNCOV_MAP_SIZE) {
+			id = 0 ;
+			continue ;
 		}
-		if (!found) {
-			perror("get_coverage: map limit") ;
-			exit(1) ; 
+
+		if (curr_stat->map[id].hit_count == 0) {
+			strcpy(curr_stat->map[id].cov_string, cov_string) ;
+			curr_stat->map[id].hit_count++ ;
+			found = 1 ;
+			break ;
 		}
+		else if (strcmp(curr_stat->map[id].cov_string, cov_string) == 0) {
+			curr_stat->map[id].hit_count++ ;
+			found = 1 ;
+			break ;
+		}
+		else id++ ;
+	}
+	if (!found) {
+		perror("get_coverage: map limit") ;
+		exit(1) ; 
 	}
 
 	detatch_shm(curr_stat) ;
@@ -131,18 +114,18 @@ __sanitizer_cov_trace_pc_guard(uint32_t *guard)
 {
 	if (!*guard) return;  
 
-	size_t nptrs ;
-	void * buffer[BT_BUF_SIZE] ;
-	char ** strings ;
+	void * callee = __builtin_return_address(0) ;
+	void * caller = __builtin_return_address(1) ;
 
-	nptrs = backtrace(buffer, BT_BUF_SIZE) ;
-	strings = backtrace_symbols(buffer, nptrs) ;
-	if (strings == 0x0) {
-		perror("__sanitizer_cov_trace_pc_guard: backtrace_symbols") ;
-		exit(1) ;
-	}
+	char callee_str[STR_BUFF] ;
+	__sanitizer_symbolize_pc(callee, "%f", callee_str, sizeof(callee_str)) ;
+	char caller_str[STR_BUFF] ;
+	__sanitizer_symbolize_pc(caller, "%f,%p", caller_str, sizeof(caller_str)) ;
 
-	get_coverage(strings) ;
+	char cov_string[STR_BUFF * 2] ;
+	sprintf(cov_string, "%s,%s", callee_str, caller_str) ;
+
+	get_coverage(cov_string) ;
 
 	free(strings) ;
 }
