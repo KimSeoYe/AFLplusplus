@@ -5,6 +5,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <signal.h>
+#include <execinfo.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -204,28 +205,125 @@ parse_file_name (char * file_name, char * long_path)
     else strcpy(file_name, long_path) ;
 }
 
+
+static int in_pipe[2] ;
+static int out_pipe[2] ;
+static int err_pipe[2] ;
+
 void
-write_covered_funs_csv(char * funcov_dir_path) 
+run_addr2line (char ** argv)
 {
+	close(in_pipe[1]) ;
+
+    dup2(in_pipe[0], 0) ;
+    
+    close(in_pipe[0]) ;
+    close(out_pipe[0]) ;
+    close(err_pipe[0]) ;
+
+    dup2(out_pipe[1], 1) ;
+    dup2(err_pipe[1], 2) ;
+
+	execv(argv[0], argv) ;
+
+    shm_deinit() ;
+	PFATAL("Failed to execute addr2line") ;
+}
+
+
+void
+save_addr2line_results (char * funcov_dir_path)
+{
+	close(in_pipe[0]) ;
+	close(err_pipe[0]) ;
+    close(in_pipe[1]) ;
+    close(out_pipe[1]) ;
+    close(err_pipe[1]) ;
+
     char input_filename[PATH_MAX] ;
     parse_file_name(input_filename, conf->input_file) ; // TODO. tokenize long path
     
     char funcov_file_path[PATH_MAX + 256] ;
     sprintf(funcov_file_path, "%s/%s.csv", funcov_dir_path, input_filename) ;
 
-    FILE * fp = fopen(funcov_file_path, "wb") ;
-    if (fp == 0x0) {
+    FILE * w_fp = fopen(funcov_file_path, "wb") ;
+    if (w_fp == 0x0) {
         shm_deinit() ;
-        PFATAL("write_covered_funs_csv: fopen") ;
+        PFATAL("save_addr2line_results: fopen") ;
     }
 
-    fprintf(fp, "callee,caller,pc_val\n") ; 
+	FILE * r_fp = fdopen(out_pipe[0], "rb") ;
+	if (r_fp == 0x0) {
+        shm_deinit() ;
+		PFATAL("save_addr2line_results: fdopen") ;
+	}
+
+    fprintf(w_fp, "pc_val,callee\n") ; 
+    char buf[BUF_SIZE] ;
+	for (int cnt = 0; fgets(buf, BUF_SIZE, r_fp) != 0x0; cnt++) {
+		if (cnt % 2 == 0)
+            fprintf(w_fp, "%s", buf) ;
+	}
+
+	fclose(r_fp) ;
+    fclose(w_fp) ;
+}
+
+void
+get_funcnames_using_addr2line (char * funcov_dir_path, char ** argv)
+{
+    if (pipe(in_pipe) != 0) goto pipe_err ;
+	if (pipe(out_pipe) != 0) goto pipe_err ;
+	if (pipe(err_pipe) != 0) goto pipe_err ;
+
+	int child_pid = fork() ;
+
+	if (child_pid == 0) {
+		run_addr2line(argv) ;
+	}
+	else if (child_pid > 0) {
+		save_addr2line_results(funcov_dir_path) ;
+	}
+	else {
+        shm_deinit() ;
+		PFATAL("translate_pc_values: fork") ;
+	}
+
+	wait(0x0) ;
+
+    return ;
+
+pipe_err:
+    shm_deinit() ;
+    PFATAL("run: pipe") ;
+}
+
+void
+write_covered_funs_csv(char * funcov_dir_path) 
+{
+    
+    char ** addr2line_argv = (char **) malloc(sizeof(char *) * (FUNCOV_MAP_SIZE + 4)) ;
+
+	addr2line_argv[0] = alloc_printf("/usr/bin/addr2line") ;
+	addr2line_argv[1] = alloc_printf("-fe") ;
+	addr2line_argv[2] = alloc_printf("%s", conf->bin_path) ;
+    int addr2line_argc = 3 ;
+
+    
     for (int i = 0; i < FUNCOV_MAP_SIZE; i++) {
         if (conf->curr_stat->map[i].hit_count == 0) continue ; 
-        fprintf(fp, "%s\n", conf->curr_stat->map[i].cov_string) ; 
+        // fprintf(fp, "%s\n", conf->curr_stat->map[i].cov_string) ; // HERE
+        addr2line_argv[addr2line_argc] = alloc_printf("%s", conf->curr_stat->map[i].cov_string) ;
+        addr2line_argc++ ;
     }
+    addr2line_argv[addr2line_argc] = (char *)0x0 ;
 
-    fclose(fp) ;
+    get_funcnames_using_addr2line(funcov_dir_path, addr2line_argv) ;
+
+    for (int i = 0; i < addr2line_argc; i++) {
+        free(addr2line_argv[i]) ;
+    }
+    free(addr2line_argv) ;
 }
 
 

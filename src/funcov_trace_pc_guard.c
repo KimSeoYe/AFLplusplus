@@ -7,7 +7,6 @@
 
 #include "../include/funcov_shm_coverage.h"  
 
-// #define BT_BUF_SIZE 5
 #define STR_BUFF 512
 
 static cov_stat_t * curr_stat ; // shm
@@ -115,17 +114,16 @@ __sanitizer_cov_trace_pc_guard(uint32_t *guard)
 	if (!*guard) return;  
 
 	void * callee = __builtin_return_address(0) ;
-	void * caller = __builtin_return_address(1) ;
+	// void * caller = __builtin_return_address(1) ;
 
-	char callee_str[STR_BUFF] ;
-	__sanitizer_symbolize_pc(callee, "%f", callee_str, sizeof(callee_str)) ;
-	char caller_str[STR_BUFF] ;
-	__sanitizer_symbolize_pc(caller, "%f,%p", caller_str, sizeof(caller_str)) ;
+	// char callee_str[STR_BUFF] ;
+	// __sanitizer_symbolize_pc(callee, "%f", callee_str, sizeof(callee_str)) ;
+	// char caller_str[STR_BUFF] ;
+	// __sanitizer_symbolize_pc(caller, "%f,%p", caller_str, sizeof(caller_str)) ;
 
-	char cov_string[STR_BUFF * 2] ;
-	sprintf(cov_string, "%s,%s", callee_str, caller_str) ;
+	char cov_string[STR_BUFF] ;
+	// sprintf(cov_string, "%s,%s", callee_str, caller_str) ;
+	sprintf(cov_string, "%p", callee) ;
 
 	get_coverage(cov_string) ;
-
-	free(strings) ;
 }

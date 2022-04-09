@@ -1200,10 +1200,8 @@ edit_func_params (u32 argc)
 
   func_params[func_par_cnt++] = "-fsanitize=address" ; // TODO. if already exist?
   func_params[func_par_cnt++] = "-fsanitize-coverage=func,trace-pc-guard" ;
-  if (!shared_linking && !partial_linking && !wasm_linking) { 
-    func_params[func_par_cnt++] = alloc_printf("%s/funcov_trace_pc_guard.o", obj_path) ;
-    func_params[func_par_cnt++] = alloc_printf("%s/funcov_shm_coverage.o", obj_path) ; // TODO.
-  }
+  func_params[func_par_cnt++] = alloc_printf("%s/funcov_trace_pc_guard.o", obj_path) ;
+  func_params[func_par_cnt++] = alloc_printf("%s/funcov_shm_coverage.o", obj_path) ; // TODO.
   func_params[func_par_cnt++] = "-o" ;
   if (o_idx != 0) {
     func_params[func_par_cnt++] = alloc_funcov_binary_name(cc_params[o_idx + 1]) ;
