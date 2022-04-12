@@ -16,7 +16,7 @@
 # To install in $HOME instead of /usr/local, use:
 #    make install prefix=$HOME
 
-CC=gcc
+CC?=gcc
 
 CFLAGS=-O3 -D_LARGEFILE64_SOURCE=1 -DHAVE_HIDDEN
 #CFLAGS=-O -DMAX_WBITS=14 -DMAX_MEM_LEVEL=7
@@ -60,6 +60,8 @@ ZINCOUT=-I.
 OBJZ = adler32.o crc32.o deflate.o infback.o inffast.o inflate.o inftrees.o trees.o zutil.o
 OBJG = compress.o uncompr.o gzclose.o gzlib.o gzread.o gzwrite.o
 OBJC = $(OBJZ) $(OBJG)
+
+.OBJS = .adler32.o .crc32.o .deflate.o .infback.o .inffast.o .inflate.o .inftrees.o .trees.o .zutil.o .compress.o .uncompr.o .gzclose.o .gzlib.o .gzread.o .gzwrite.o
 
 PIC_OBJZ = adler32.lo crc32.lo deflate.lo infback.lo inffast.lo inflate.lo inftrees.lo trees.lo zutil.lo
 PIC_OBJG = compress.lo uncompr.lo gzclose.lo gzlib.lo gzread.lo gzwrite.lo
@@ -130,6 +132,9 @@ cover: infcover
 libz.a: $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 	-@ ($(RANLIB) $@ || true) >/dev/null 2>&1
+
+.libz.a: $(.OBJS)
+	$(AR) $(ARFLAGS) $@ $(.OBJS)
 
 match.o: match.S
 	$(CPP) match.S > _match.s
@@ -286,7 +291,8 @@ placebo $(SHAREDLIBV): $(PIC_OBJS) libz.a
 	rm -f $(SHAREDLIB) $(SHAREDLIBM)
 	ln -s $@ $(SHAREDLIB)
 	ln -s $@ $(SHAREDLIBM)
-	-@rmdir objs
+	-@rm -rf objs
+#-@rmdir objs
 
 example$(EXE): example.o $(STATICLIB)
 	$(CC) $(CFLAGS) -o $@ example.o $(TEST_LDFLAGS)
@@ -372,8 +378,11 @@ zconf: $(SRCDIR)zconf.h.in
 mostlyclean: clean
 clean:
 	rm -f *.o *.lo *~ \
+		.*.o .*.lo \
 	   example$(EXE) minigzip$(EXE) fuzzer$(EXE) examplesh$(EXE) minigzipsh$(EXE) \
 	   example64$(EXE) minigzip64$(EXE) \
+	   .example$(EXE) .minigzip$(EXE) .fuzzer$(EXE) .examplesh$(EXE) .minigzipsh$(EXE) \
+	   .example64$(EXE) .minigzip64$(EXE) \
 	   infcover \
 	   libz.* foo.gz so_locations \
 	   _match.s maketree contrib/infback9/*.o
